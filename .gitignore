@@ -26,3 +26,4 @@ go.work.sum
 
 # VS Code
 **/.idea
+**/sample
