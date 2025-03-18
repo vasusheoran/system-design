@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"custom-interpreter-go/pkg/feature"
 	"fmt"
 	"strings"
 )
@@ -21,12 +22,17 @@ func incIdent() { traceLevel = traceLevel + 1 }
 func decIdent() { traceLevel = traceLevel - 1 }
 
 func trace(msg string) string {
-	incIdent()
-	tracePrint("BEGIN " + msg)
+	if feature.EnableTracing {
+		incIdent()
+		tracePrint("BEGIN " + msg)
+	}
+
 	return msg
 }
 
 func untrace(msg string) {
-	tracePrint("END " + msg)
-	decIdent()
+	if feature.EnableTracing {
+		tracePrint("END " + msg)
+		decIdent()
+	}
 }
