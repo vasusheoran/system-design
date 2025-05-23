@@ -1,54 +1,59 @@
 package repo
 
 import (
-	"cab-booking/pkg/contracts"
+	"cab-booking/contracts"
 	"fmt"
+	"math"
 )
 
-type Driver interface {
-	GetDriverByID(string) (*contracts.Driver, error)
-	GetDriverByNumber(string) (*contracts.Driver, error)
-	UpdateLocation(contracts.Location) error
-	SaveDriver(driver contracts.Driver) error
+type DriverRepo interface {
+	GetDriverByUsername(username string) (*contracts.Driver, error)
+	Save(driver contracts.Driver) error
+	GetNearbyDrivers(location contracts.Location, units float64, size int) []contracts.Driver
 }
 
-type driverRepo struct {
-	db            map[string]contracts.Driver
-	numberToIDMap map[string]string
+type driver struct {
+	db map[string]contracts.Driver
 }
 
-func (d *driverRepo) UpdateLocation(location contracts.Location) error {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (d *driverRepo) GetDriverByNumber(number string) (*contracts.Driver, error) {
-	id, ok := d.numberToIDMap[number]
-	if !ok {
-		return nil, fmt.Errorf("driver with number %s not found", number)
+func (d *driver) GetNearbyDrivers(location contracts.Location, units float64, size int) []contracts.Driver {
+	var result []contracts.Driver
+	for _, dr := range d.db {
+		if GetDistance(location, dr.Location) <= units {
+			result = append(result, dr)
+		}
 	}
 
-	return d.GetDriverByID(id)
-}
-
-func (d *driverRepo) GetDriverByID(id string) (*contracts.Driver, error) {
-	driver, ok := d.db[id]
-	if !ok {
-		return nil, fmt.Errorf("driver with id %s not found", id)
+	if len(result) >= size {
+		return result[:size]
 	}
 
-	return &driver, nil
+	return result
 }
 
-func (d *driverRepo) SaveDriver(driver contracts.Driver) error {
+func (d *driver) Save(driver contracts.Driver) error {
+	if len(driver.ID) == 0 {
+		return fmt.Errorf("driver username can not be empty")
+	}
+
 	d.db[driver.ID] = driver
-	d.numberToIDMap[driver.Number] = driver.ID
 	return nil
 }
 
-func NewDriver() Driver {
-	return &driverRepo{
-		db:            map[string]contracts.Driver{},
-		numberToIDMap: map[string]string{},
+func (d *driver) GetDriverByUsername(username string) (*contracts.Driver, error) {
+	if u, ok := d.db[username]; ok {
+		return &u, nil
 	}
+
+	return nil, fmt.Errorf("driver with `%s` username not found")
+}
+
+func NewDriverRepo() DriverRepo {
+	return &driver{make(map[string]contracts.Driver)}
+}
+
+func GetDistance(source, destination contracts.Location) float64 {
+	xdiff := source.X - destination.X
+	ydiff := source.Y - destination.Y
+	return math.Abs(float64(xdiff)) + math.Abs(float64(ydiff))
 }

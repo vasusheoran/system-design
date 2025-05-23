@@ -1,61 +1,115 @@
 package main
 
 import (
-	"cab-booking/pkg/contracts"
+	"cab-booking/contracts"
+	"cab-booking/pkg/driver"
 	"cab-booking/pkg/repo"
+	"cab-booking/pkg/ride"
+	"cab-booking/pkg/user"
 	"fmt"
 	"github.com/google/uuid"
-	"log"
-	"math/rand"
-	"os"
+	"time"
 )
 
 func main() {
-	logger := log.New(os.Stdout, "", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
-	userRepo := repo.NewUser(logger)
-	driverRepo := repo.NewDriver()
+	userRepo := repo.NewUserRepo()
+	userService := user.NewUserService(userRepo)
 
-	userNumbers := []string{}
-	driverNumbers := []string{}
+	driverRepo := repo.NewDriverRepo()
+	driverService := driver.NewDriverService(driverRepo)
 
-	for i := 0; i < 10; i++ {
-		dr := contracts.Driver{
-			ID:     uuid.NewString(),
-			Name:   fmt.Sprintf("test-%d", rand.Intn(10)),
-			Number: fmt.Sprintf("01234567%d%d", rand.Intn(10), rand.Intn(10)),
-			VehicleDetails: contracts.Vehicle{
-				ID:        uuid.NewString(),
-				RegNumber: uuid.NewString(),
-				Capacity:  rand.Int63n(8),
-			},
-		}
+	rideService := ride.NewRideService(driverService, userService)
 
-		driverNumbers = append(driverNumbers, dr.Number)
-		driverRepo.SaveDriver(dr)
-	}
-	for i := 0; i < 10; i++ {
-		user := contracts.User{
-			ID:     uuid.NewString(),
-			Name:   fmt.Sprintf("test-%d", rand.Intn(10)),
-			Number: fmt.Sprintf("01234567%d%d", rand.Intn(10), rand.Intn(10)),
-		}
-
-		userNumbers = append(userNumbers, user.Number)
-		userRepo.SaveUser(user)
+	user := contracts.User{
+		ID:   uuid.NewString(), // some username
+		Name: "Abc",
+		Age:  20,
+		Location: contracts.Location{
+			X: 0,
+			Y: 0,
+		},
 	}
 
-	user, err := userRepo.GetUserByNumber(userNumbers[0])
+	err := userService.AddUser(uuid.NewString(), user)
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Println(user)
-
-	driver, err := driverRepo.GetDriverByNumber(driverNumbers[0])
+	user.Age = 21
+	err = userService.UpdateUser(user)
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Println(driver)
+	err = userService.UpdateLocation(user.ID, contracts.Location{5, 5})
+	if err != nil {
+		panic(err)
+	}
 
+	driver := contracts.Driver{
+		ID:   uuid.NewString(), // some username
+		Name: "Abc",
+		Age:  20,
+		Location: contracts.Location{
+			X: 0,
+			Y: 0,
+		},
+		Status: contracts.Available,
+		Vehicle: contracts.Vehicle{
+			ID:       uuid.NewString(),
+			Type:     contracts.Sedan,
+			Name:     "Swift",
+			Capacity: 5,
+		},
+	}
+	err = driverService.AddDriver(driver.ID, driver)
+	if err != nil {
+		panic(err)
+	}
+
+	err = driverService.UpdateLocation(driver.ID, contracts.Location{5, 5})
+	if err != nil {
+		panic(err)
+	}
+
+	err = driverService.UpdateStatus(driver.ID, contracts.Busy)
+	if err != nil {
+		panic(err)
+	}
+
+	_, err = rideService.Search(user.ID, user.Location)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	err = driverService.UpdateLocation(driver.ID, contracts.Location{1, 1})
+	if err != nil {
+		panic(err)
+	}
+
+	driverList, err := rideService.Search(user.ID, user.Location)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	if driverList != nil && len(driverList) > 0 {
+		fmt.Println(len(driverList))
+	}
+
+	ride, err := rideService.BookRide(user.ID, driverList[0].ID, user.Location, contracts.Location{10, 10})
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("%+v\n", ride)
+
+	ride, err = rideService.BookRide(user.ID, driverList[0].ID, user.Location, contracts.Location{18, 10})
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("%+v\n", ride)
+
+	earnings, err := rideService.Earnings(driverList[0].ID, time.Now().Add(-(time.Minute * 2)))
+	fmt.Printf("Total earnings for driver `%s` is `%.2f`\n", driverList[0].ID, earnings)
 }
